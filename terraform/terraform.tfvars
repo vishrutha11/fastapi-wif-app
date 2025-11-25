@@ -1,0 +1,5 @@
+project_id       = "backend-gke-project"
+region           = "us-central1"
+zone             = "us-central1-a"
+docker_image     = "us-central1-docker.pkg.dev/backend-gke-project/fastapi-repo/fastapi-app:latest"
+vm_service_account = "fastapi-vm-sa@backend-gke-project.iam.gserviceaccount.com"

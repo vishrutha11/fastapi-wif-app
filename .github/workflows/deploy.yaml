@@ -1,0 +1,52 @@
+name: Build & Deploy FastAPI to GCP VM
+
+on:
+  push:
+    branches: ["main"]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP (OIDC)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: "${{ secrets.GCP_WIF }}"
+          service_account: "${{ secrets.VM_SERVICE_ACCOUNT }}"
+
+      - name: Configure Docker auth for Artifact Registry
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+
+      - name: Build Docker image
+        run: |
+          IMAGE="us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/fastapi-repo/fastapi-app:latest"
+          docker build -t "$IMAGE" .
+          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+
+      - name: Push Docker image
+        run: |
+          docker push ${{ env.IMAGE }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        working-directory: terraform
+        run: terraform init
+
+      - name: Terraform Apply
+        working-directory: terraform
+        run: |
+          terraform apply -auto-approve \
+            -var="docker_image=${{ env.IMAGE }}" \
+            -var="project_id=${{ secrets.GCP_PROJECT_ID }}" \
+            -var="region=us-central1" \
+            -var="vm_service_account=${{ secrets.VM_SERVICE_ACCOUNT }}"
